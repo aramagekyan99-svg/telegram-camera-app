@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Сделать фото</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 30px 20px;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f4f4f4;
+    }
+
+    .box {
+      max-width: 400px;
+      margin: auto;
+      background: white;
+      padding: 25px;
+      border-radius: 20px;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      margin-top: 20px;
+      border: 0;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      background: #1683ff;
+      color: white;
+    }
+
+    video {
+      width: 100%;
+      margin-top: 20px;
+      border-radius: 15px;
+      display: none;
+    }
+
+    #status {
+      margin-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="box">
+
+  <h2>📷 Сделать фото</h2>
+
+  <p>
+    После разрешения доступа к камере будет автоматически
+    сделано и отправлено фото.
+  </p>
+
+  <button id="allow">
+    Разрешить камеру
+  </button>
+
+  <video id="video" autoplay playsinline></video>
+
+  <div id="status"></div>
+
+</div>
+
+<script>
+
+const button = document.getElementById("allow");
+const video = document.getElementById("video");
+const status = document.getElementById("status");
+
+button.onclick = async () => {
+
+  try {
+
+    status.textContent = "Запрашиваем доступ к камере...";
+
+    const stream =
+      await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user"
+        },
+        audio: false
+      });
+
+    video.srcObject = stream;
+    video.style.display = "block";
+
+    status.textContent = "Готовим фото...";
+
+    await new Promise(resolve => {
+      if (video.readyState >= 2) {
+        resolve();
+      } else {
+        video.onloadeddata = resolve;
+      }
+    });
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 800)
+    );
+
+    const canvas =
+      document.createElement("canvas");
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx =
+      canvas.getContext("2d");
+
+    ctx.drawImage(
+      video,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    const image =
+      canvas.toDataURL("image/jpeg", 0.85);
+
+    status.textContent = "Отправляем фото...";
+
+    const response =
+      await fetch("/send-photo", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          image: image
+        })
+      });
+
+    const result =
+      await response.json();
+
+    if (!result.ok) {
+      throw new Error("Telegram error");
+    }
+
+    status.textContent = "✅ Фото отправлено.";
+
+    stream.getTracks().forEach(
+      track => track.stop()
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    status.textContent =
+      "❌ Доступ к камере не предоставлен.";
+
+  }
+
+};
+
+</script>
+
+</body>
+</html
